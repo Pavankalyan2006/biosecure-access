@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2, ArrowRight, Fingerprint, Heart, Dna } from 'lucide-react';
 import BiometricScanner from '../ui/BiometricScanner';
+import { Alert, AlertDescription } from '../ui/alert';
 
 const AuthenticationFlow = () => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const AuthenticationFlow = () => {
   const [biometricStep, setBiometricStep] = useState<'fingerprint' | 'heartbeat' | 'dna'>('fingerprint');
   const [isLoading, setIsLoading] = useState(false);
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
+  const [apiStatus, setApiStatus] = useState<string | null>(null);
 
   const handleCredentialSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,12 +29,83 @@ const AuthenticationFlow = () => {
     
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
-      setCurrentStep('biometric');
-      toast.success('Credentials verified');
-    }, 1500);
+    // API call to validate credentials
+    fetch('http://localhost:5000/api/validate-credentials', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    })
+      .then(response => response.json())
+      .then(data => {
+        setIsLoading(false);
+        if (data.success) {
+          setCurrentStep('biometric');
+          toast.success('Credentials verified');
+        } else {
+          toast.error(data.message || 'Invalid credentials');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        setIsLoading(false);
+        // Fallback to demo mode if API is not available
+        setApiStatus('Could not connect to biometric server. Running in demo mode.');
+        setTimeout(() => {
+          setCurrentStep('biometric');
+          toast.success('Credentials verified (Demo Mode)');
+        }, 1000);
+      });
+  };
+
+  const processBiometricScan = (type: 'fingerprint' | 'heartbeat' | 'dna') => {
+    setScanStatus('scanning');
+    
+    // If API status shows we're in demo mode, use the mock data flow
+    if (apiStatus) {
+      setTimeout(() => {
+        // 90% chance of success for demo purposes
+        const success = Math.random() > 0.1;
+        handleScanComplete(success);
+      }, 3000);
+      return;
+    }
+    
+    // Real API call to Python backend
+    const endpoint = `http://localhost:5000/api/biometric/${type}`;
+    
+    fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        userId: email, // Using email as userId for demo
+        // In a real app, you would send the actual biometric data here
+        // For fingerprint: image data
+        // For heartbeat: sensor readings
+        // For DNA: sample data
+      }),
+    })
+      .then(response => response.json())
+      .then(data => {
+        handleScanComplete(data.success);
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        // Fallback to demo mode if API is not available
+        if (!apiStatus) {
+          setApiStatus('Could not connect to biometric server. Running in demo mode.');
+        }
+        
+        // Simulate scan process in demo mode
+        setTimeout(() => {
+          // 90% chance of success for demo purposes
+          const success = Math.random() > 0.1;
+          handleScanComplete(success);
+        }, 3000);
+      });
   };
 
   const handleScanComplete = (success: boolean) => {
@@ -63,14 +136,7 @@ const AuthenticationFlow = () => {
   };
 
   const startScan = () => {
-    setScanStatus('scanning');
-    
-    // Simulate scan process
-    setTimeout(() => {
-      // 90% chance of success for demo purposes
-      const success = Math.random() > 0.1;
-      handleScanComplete(success);
-    }, 3000);
+    processBiometricScan(biometricStep);
   };
 
   return (
@@ -124,6 +190,14 @@ const AuthenticationFlow = () => {
       ) : (
         <div className="animate-fade-in">
           <h2 className="text-2xl font-bold text-biometric-dark mb-6">Biometric Verification</h2>
+          
+          {apiStatus && (
+            <Alert className="mb-4 bg-yellow-50 border-yellow-200">
+              <AlertDescription className="text-yellow-800">
+                {apiStatus}
+              </AlertDescription>
+            </Alert>
+          )}
           
           <div className="text-center space-y-6">
             <div className="flex justify-center mb-2">
