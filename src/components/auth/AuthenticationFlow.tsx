@@ -1,0 +1,193 @@
+
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { Loader2, ArrowRight, Fingerprint, Heart, Dna } from 'lucide-react';
+import BiometricScanner from '../ui/BiometricScanner';
+
+const AuthenticationFlow = () => {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [currentStep, setCurrentStep] = useState<'credentials' | 'biometric'>('credentials');
+  const [biometricStep, setBiometricStep] = useState<'fingerprint' | 'heartbeat' | 'dna'>('fingerprint');
+  const [isLoading, setIsLoading] = useState(false);
+  const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
+
+  const handleCredentialSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email || !password) {
+      toast.error('Please enter both email and password');
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      setIsLoading(false);
+      setCurrentStep('biometric');
+      toast.success('Credentials verified');
+    }, 1500);
+  };
+
+  const handleScanComplete = (success: boolean) => {
+    if (success) {
+      setScanStatus('success');
+      
+      setTimeout(() => {
+        if (biometricStep === 'fingerprint') {
+          setBiometricStep('heartbeat');
+          setScanStatus('idle');
+        } else if (biometricStep === 'heartbeat') {
+          setBiometricStep('dna');
+          setScanStatus('idle');
+        } else if (biometricStep === 'dna') {
+          // All scans complete
+          toast.success('Biometric authentication successful');
+          navigate('/dashboard');
+        }
+      }, 1000);
+    } else {
+      setScanStatus('error');
+      toast.error('Biometric verification failed. Please try again.');
+      
+      setTimeout(() => {
+        setScanStatus('idle');
+      }, 2000);
+    }
+  };
+
+  const startScan = () => {
+    setScanStatus('scanning');
+    
+    // Simulate scan process
+    setTimeout(() => {
+      // 90% chance of success for demo purposes
+      const success = Math.random() > 0.1;
+      handleScanComplete(success);
+    }, 3000);
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
+      {currentStep === 'credentials' ? (
+        <div className="animate-fade-in">
+          <h2 className="text-2xl font-bold text-biometric-dark mb-6">Login to BioSecure</h2>
+          
+          <form onSubmit={handleCredentialSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="user@example.com"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+            
+            <Button
+              type="submit"
+              className="w-full bg-biometric-blue hover:bg-biometric-blue/90"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  Continue to Biometric Verification
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
+            </Button>
+          </form>
+        </div>
+      ) : (
+        <div className="animate-fade-in">
+          <h2 className="text-2xl font-bold text-biometric-dark mb-6">Biometric Verification</h2>
+          
+          <div className="text-center space-y-6">
+            <div className="flex justify-center mb-2">
+              <div className="flex space-x-2">
+                <div className={`w-3 h-3 rounded-full ${biometricStep === 'fingerprint' ? 'bg-biometric-blue' : 'bg-gray-200'}`}></div>
+                <div className={`w-3 h-3 rounded-full ${biometricStep === 'heartbeat' ? 'bg-biometric-blue' : 'bg-gray-200'}`}></div>
+                <div className={`w-3 h-3 rounded-full ${biometricStep === 'dna' ? 'bg-biometric-blue' : 'bg-gray-200'}`}></div>
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 py-8 px-4 rounded-lg">
+              {biometricStep === 'fingerprint' && (
+                <div className="text-center">
+                  <Fingerprint className="w-16 h-16 mx-auto mb-4 text-biometric-blue" />
+                  <h3 className="text-lg font-medium mb-2">Fingerprint Verification</h3>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Place your finger on the scanner to verify your identity.
+                  </p>
+                </div>
+              )}
+              
+              {biometricStep === 'heartbeat' && (
+                <div className="text-center">
+                  <Heart className="w-16 h-16 mx-auto mb-4 text-biometric-blue animate-pulse" />
+                  <h3 className="text-lg font-medium mb-2">Heartbeat Verification</h3>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Place your wrist on the sensor to verify your heartbeat pattern.
+                  </p>
+                </div>
+              )}
+              
+              {biometricStep === 'dna' && (
+                <div className="text-center">
+                  <Dna className="w-16 h-16 mx-auto mb-4 text-biometric-blue" />
+                  <h3 className="text-lg font-medium mb-2">DNA Verification</h3>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Submit your DNA sample to complete the verification.
+                  </p>
+                </div>
+              )}
+              
+              <BiometricScanner 
+                type={biometricStep}
+                status={scanStatus}
+                className="mx-auto"
+              />
+            </div>
+            
+            <Button
+              type="button"
+              onClick={startScan}
+              className="bg-biometric-blue hover:bg-biometric-blue/90"
+              disabled={scanStatus !== 'idle'}
+            >
+              {scanStatus === 'idle' && 'Start Scan'}
+              {scanStatus === 'scanning' && 'Scanning...'}
+              {scanStatus === 'success' && 'Verified!'}
+              {scanStatus === 'error' && 'Try Again'}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AuthenticationFlow;
