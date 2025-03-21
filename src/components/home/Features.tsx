@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Shield, Lock, Users, Building, Bank, FileDigit, CheckCircle2 } from 'lucide-react';
+import { Shield, Lock, Users, Building, Landmark, FileDigit, CheckCircle2 } from 'lucide-react';
 import GlassCard from '../ui/GlassCard';
 
 const features = [
@@ -25,7 +25,7 @@ const features = [
     description: "Ideal for high-security facilities requiring stringent biometric access control systems."
   },
   {
-    icon: <Bank className="w-6 h-6 text-biometric-blue" />,
+    icon: <Landmark className="w-6 h-6 text-biometric-blue" />,
     title: "Financial Protection",
     description: "Secure financial transactions and sensitive data with multi-factor biometric authentication."
   },
@@ -53,8 +53,8 @@ const Features = () => {
             <GlassCard 
               key={index}
               hoverEffect={true}
-              className="animate-fade-in-up"
-              style={{ animationDelay: `${0.1 * index}s` }}
+              className={`animate-fade-in-up`}
+              // Adding animation delay with CSS variables instead of inline style
             >
               <div className="flex flex-col h-full">
                 <div className="mb-4">
