@@ -9,6 +9,9 @@ import { Loader2, ArrowRight, Fingerprint, Heart, Dna } from 'lucide-react';
 import BiometricScanner from '../ui/BiometricScanner';
 import { Alert, AlertDescription } from '../ui/alert';
 
+// Base URL for the Python backend
+const BIOMETRIC_SERVER_URL = 'http://localhost:5000';
+
 const AuthenticationFlow = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -18,6 +21,27 @@ const AuthenticationFlow = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
   const [apiStatus, setApiStatus] = useState<string | null>(null);
+  const [serverConnected, setServerConnected] = useState<boolean | null>(null);
+
+  // Check if the biometric server is accessible
+  useEffect(() => {
+    const checkServerConnection = async () => {
+      try {
+        const response = await fetch(`${BIOMETRIC_SERVER_URL}/api/validate-credentials`, {
+          method: 'HEAD',
+          mode: 'no-cors'
+        });
+        setServerConnected(true);
+        setApiStatus(null);
+      } catch (error) {
+        console.error('Failed to connect to biometric server:', error);
+        setServerConnected(false);
+        setApiStatus('Could not connect to biometric server. Running in demo mode.');
+      }
+    };
+
+    checkServerConnection();
+  }, []);
 
   const handleCredentialSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,8 +53,18 @@ const AuthenticationFlow = () => {
     
     setIsLoading(true);
     
+    // If server is not connected, use demo mode
+    if (serverConnected === false) {
+      setTimeout(() => {
+        setIsLoading(false);
+        setCurrentStep('biometric');
+        toast.success('Credentials verified (Demo Mode)');
+      }, 1000);
+      return;
+    }
+    
     // API call to validate credentials
-    fetch('http://localhost:5000/api/validate-credentials', {
+    fetch(`${BIOMETRIC_SERVER_URL}/api/validate-credentials`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -63,7 +97,7 @@ const AuthenticationFlow = () => {
     setScanStatus('scanning');
     
     // If API status shows we're in demo mode, use the mock data flow
-    if (apiStatus) {
+    if (serverConnected === false) {
       setTimeout(() => {
         // 90% chance of success for demo purposes
         const success = Math.random() > 0.1;
@@ -73,7 +107,7 @@ const AuthenticationFlow = () => {
     }
     
     // Real API call to Python backend
-    const endpoint = `http://localhost:5000/api/biometric/${type}`;
+    const endpoint = `${BIOMETRIC_SERVER_URL}/api/biometric/${type}`;
     
     fetch(endpoint, {
       method: 'POST',
@@ -83,9 +117,6 @@ const AuthenticationFlow = () => {
       body: JSON.stringify({ 
         userId: email, // Using email as userId for demo
         // In a real app, you would send the actual biometric data here
-        // For fingerprint: image data
-        // For heartbeat: sensor readings
-        // For DNA: sample data
       }),
     })
       .then(response => response.json())
@@ -95,9 +126,7 @@ const AuthenticationFlow = () => {
       .catch(error => {
         console.error('Error:', error);
         // Fallback to demo mode if API is not available
-        if (!apiStatus) {
-          setApiStatus('Could not connect to biometric server. Running in demo mode.');
-        }
+        setApiStatus('Could not connect to biometric server. Running in demo mode.');
         
         // Simulate scan process in demo mode
         setTimeout(() => {
@@ -141,6 +170,14 @@ const AuthenticationFlow = () => {
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
+      {serverConnected === false && (
+        <Alert className="mb-6 bg-yellow-50 border-yellow-200">
+          <AlertDescription className="text-yellow-800">
+            {apiStatus}
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {currentStep === 'credentials' ? (
         <div className="animate-fade-in">
           <h2 className="text-2xl font-bold text-biometric-dark mb-6">Login to BioSecure</h2>

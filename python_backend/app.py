@@ -65,11 +65,8 @@ def verify_fingerprint():
     
     # In a real app, you would retrieve the user's registered fingerprint
     # and compare it with the provided sample
-    if user_id in users:
-        result = fingerprint_scanner.verify(data)
-        return jsonify({"success": result})
-    else:
-        return jsonify({"success": False, "message": "User not found"})
+    result = fingerprint_scanner.verify(data)
+    return jsonify({"success": result})
 
 @app.route('/api/biometric/heartbeat', methods=['POST'])
 def verify_heartbeat():
@@ -78,11 +75,8 @@ def verify_heartbeat():
     
     # In a real app, you would retrieve the user's registered heartbeat pattern
     # and compare it with the provided sample
-    if user_id in users:
-        result = heartbeat_scanner.verify(data)
-        return jsonify({"success": result})
-    else:
-        return jsonify({"success": False, "message": "User not found"})
+    result = heartbeat_scanner.verify(data)
+    return jsonify({"success": result})
 
 @app.route('/api/biometric/dna', methods=['POST'])
 def verify_dna():
@@ -91,13 +85,12 @@ def verify_dna():
     
     # In a real app, you would retrieve the user's registered DNA profile
     # and compare it with the provided sample
-    if user_id in users:
-        result = dna_analyzer.verify(data)
-        return jsonify({"success": result})
-    else:
-        return jsonify({"success": False, "message": "User not found"})
+    result = dna_analyzer.verify(data)
+    return jsonify({"success": result})
 
 if __name__ == '__main__':
     print("Starting BioSecure Python Backend...")
+    print("Server URL: http://localhost:5000")
+    print("Default User: user@example.com / password123")
     print("Biometric processing services initialized.")
     app.run(debug=True, port=5000)

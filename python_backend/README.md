@@ -9,7 +9,7 @@ This is a Flask-based backend for the BioSecure application that processes biome
 
 2. Install the required packages:
 ```
-pip install flask flask-cors
+pip install -r requirements.txt
 ```
 
 3. Run the application:
@@ -25,6 +25,18 @@ The server will start on http://localhost:5000
 - `POST /api/biometric/fingerprint` - Processes fingerprint data
 - `POST /api/biometric/heartbeat` - Processes heartbeat data
 - `POST /api/biometric/dna` - Processes DNA data
+
+## Testing the Server
+
+The frontend will automatically detect if the server is running. If not, it will fallback to demo mode.
+
+### Default Credentials
+- Email: `user@example.com`
+- Password: `password123`
+
+## CORS Support
+
+This server has CORS enabled, so it can receive requests from different origins (like your React app).
 
 ## Next Steps for Production
 
