@@ -3,19 +3,64 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import time
 import random
+import platform
+import sys
+import os
 
 app = Flask(__name__)
 # Configure CORS to allow requests from any origin
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+# Determine if we're on Windows and can potentially use Windows Hello
+is_windows = platform.system() == 'Windows'
+has_fingerprint_reader = False
+
+# Try to import Windows-specific modules if on Windows
+if is_windows:
+    try:
+        import win32com.client
+        # Check if Windows Hello is available
+        try:
+            # This is a simplified check - in a real app, you'd use the Windows Biometric Framework API
+            wbf_check = os.path.exists(os.path.join(os.environ['WINDIR'], 'System32', 'winbio.dll'))
+            has_fingerprint_reader = wbf_check
+            print(f"Windows Biometric Framework available: {has_fingerprint_reader}")
+        except Exception as e:
+            print(f"Error checking for Windows Hello: {e}")
+    except ImportError:
+        print("PyWin32 not available, Windows Hello integration disabled")
+
 # In a real application, these would be more sophisticated modules
 # with actual biometric processing capabilities
 class FingerprintScanner:
+    def __init__(self):
+        self.has_hardware = has_fingerprint_reader
+        print(f"Fingerprint scanner initialized. Hardware available: {self.has_hardware}")
+
     def verify(self, data):
-        # In a real app, this would process an actual fingerprint image
-        time.sleep(2)  # Simulate processing time
-        # Return True 90% of the time for demo purposes
-        return random.random() > 0.1
+        # If we have a fingerprint reader, we could attempt to use Windows Hello
+        # In a real app, this would use the proper Windows APIs
+        if self.has_hardware and is_windows:
+            print("Attempting to use Windows Hello for fingerprint verification")
+            try:
+                # Simulate a Windows Hello prompt
+                # In a real app, you would use the Windows Hello API
+                # This is just a simulation for demonstration purposes
+                print("Please scan your fingerprint on your device's reader")
+                time.sleep(2)  # Give user time to scan
+                
+                # In a real implementation, this would verify the fingerprint
+                # For demo, we'll return success most of the time
+                return random.random() > 0.1
+            except Exception as e:
+                print(f"Error with Windows Hello: {e}")
+                return False
+        else:
+            # Fall back to simulation if no hardware is available
+            print("No fingerprint hardware detected, using simulation mode")
+            time.sleep(2)  # Simulate processing time
+            # Return True 90% of the time for demo purposes
+            return random.random() > 0.1
 
 class HeartbeatScanner:
     def verify(self, data):
@@ -67,7 +112,13 @@ def validate_credentials():
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint to verify the server is running"""
-    return jsonify({"status": "OK", "message": "Biometric server is running"})
+    fingerprint_status = "available" if has_fingerprint_reader else "unavailable"
+    return jsonify({
+        "status": "OK", 
+        "message": "Biometric server is running",
+        "fingerprint_reader": fingerprint_status,
+        "platform": platform.system()
+    })
 
 @app.route('/api/biometric/fingerprint', methods=['POST', 'OPTIONS'])
 def verify_fingerprint():
@@ -82,7 +133,11 @@ def verify_fingerprint():
     # In a real app, you would retrieve the user's registered fingerprint
     # and compare it with the provided sample
     result = fingerprint_scanner.verify(data)
-    return jsonify({"success": result})
+    return jsonify({
+        "success": result, 
+        "hardwareAvailable": has_fingerprint_reader,
+        "platform": platform.system()
+    })
 
 @app.route('/api/biometric/heartbeat', methods=['POST', 'OPTIONS'])
 def verify_heartbeat():
@@ -119,6 +174,8 @@ if __name__ == '__main__':
     print("Server URL: http://localhost:5000")
     print("Default User: user@example.com / password123")
     print("Biometric processing services initialized.")
+    print(f"Platform detected: {platform.system()}")
+    print(f"Fingerprint reader detected: {has_fingerprint_reader}")
     print("API Endpoints:")
     print("  - GET /api/health")
     print("  - POST /api/validate-credentials")
