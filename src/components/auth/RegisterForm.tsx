@@ -10,7 +10,8 @@ import {
   registerFingerprint, 
   isFingerprintAvailable, 
   isWebAuthnRestricted,
-  getWebAuthnRestrictionReason 
+  getWebAuthnRestrictionReason,
+  logWebAuthnRestriction
 } from '@/lib/webauthn';
 
 const steps = [
@@ -47,31 +48,21 @@ const RegisterForm = () => {
   });
 
   useEffect(() => {
-    // Check if fingerprint is available and if WebAuthn is restricted
     const checkFingerprint = async () => {
       const available = await isFingerprintAvailable();
       const restricted = isWebAuthnRestricted();
-      const restrictionReason = restricted ? getWebAuthnRestrictionReason() : null;
+      
+      if (restricted) {
+        logWebAuthnRestriction();
+      }
       
       setWebAuthnStatus({
         isRestricted: restricted,
-        restrictionReason,
+        restrictionReason: restricted ? 'WebAuthn is restricted by the site\'s permissions policy' : null,
         isAvailable: available
       });
       
       setIsFingerprintSupported(available);
-      
-      if (restricted) {
-        toast.info("Using simulated fingerprint authentication", {
-          description: restrictionReason || "Your environment has WebAuthn restrictions",
-          duration: 6000
-        });
-      } else if (!available) {
-        toast.warning("Fingerprint authentication isn't supported on this device", {
-          description: "We'll use simulation mode instead",
-          duration: 5000
-        });
-      }
     };
     
     checkFingerprint();

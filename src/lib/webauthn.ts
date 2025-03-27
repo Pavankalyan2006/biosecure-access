@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 
 // WebAuthn utility functions
 
@@ -205,7 +206,7 @@ export async function authenticateWithFingerprint(username: string): Promise<boo
       }
     }
     
-    // Always fall back to simulation in case of any error
+    // Always fall back to simulation mode in case of any error
     console.log("WebAuthn failed, falling back to simulation mode");
     return simulateAuthentication(username);
   }
@@ -251,16 +252,27 @@ export function getWebAuthnRestrictionReason(): string | null {
     // Check for permissions policy restrictions
     const permissionStatus = (document as any).featurePolicy?.allowsFeature('publickey-credentials-create');
     if (permissionStatus === false) {
-      return "WebAuthn is restricted by the site's permissions policy";
+      return "WebAuthn is restricted by the site's permissions policy. This might be due to iframe embedding or cross-origin constraints.";
     }
     
     // Check if we're in an iframe
     if (window !== window.top) {
-      return "WebAuthn is restricted because the page is running in an iframe";
+      return "WebAuthn is restricted because the page is running in an iframe. This is a security measure to prevent unauthorized credential access.";
     }
     
     return null; // No restriction detected
   } catch (e) {
-    return "WebAuthn is restricted due to security constraints";
+    return "WebAuthn is restricted due to security constraints. Please check your browser settings and page configuration.";
+  }
+}
+
+export function logWebAuthnRestriction(): void {
+  const reason = getWebAuthnRestrictionReason();
+  if (reason) {
+    toast.warning('Biometric Authentication Restricted', {
+      description: reason,
+      duration: 6000
+    });
+    console.warn('WebAuthn Restriction:', reason);
   }
 }
