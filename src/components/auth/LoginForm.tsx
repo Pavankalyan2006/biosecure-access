@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2, Fingerprint, Lock, Mail, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { authenticateWithFingerprint, isFingerprintAvailable } from '@/lib/webauthn';
+import { authenticateWithFingerprint, isFingerprintAvailable, isWebAuthnRestricted } from '@/lib/webauthn';
 
 const LoginForm = () => {
   const navigate = useNavigate();
@@ -15,12 +15,21 @@ const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFingerprintSupported, setIsFingerprintSupported] = useState(false);
   const [useFingerprintAuth, setUseFingerprintAuth] = useState(false);
+  const [isSimulationMode, setIsSimulationMode] = useState(false);
 
   useEffect(() => {
     // Check if fingerprint authentication is available
     const checkFingerprint = async () => {
       const available = await isFingerprintAvailable();
       setIsFingerprintSupported(available);
+      setIsSimulationMode(isWebAuthnRestricted());
+      
+      if (isWebAuthnRestricted() && available) {
+        toast.info('Using fingerprint simulation mode', {
+          description: 'WebAuthn is restricted in this environment. Using simulation mode instead.',
+          duration: 5000,
+        });
+      }
     };
     
     checkFingerprint();
@@ -93,6 +102,20 @@ const LoginForm = () => {
         <h1 className="text-2xl font-bold text-biometric-dark">Log In</h1>
         <p className="text-gray-500 mt-2">Access your secure portal</p>
       </div>
+      
+      {isSimulationMode && isFingerprintSupported && (
+        <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-md flex items-start gap-3">
+          <AlertTriangle className="text-blue-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-blue-800">
+              Simulation Mode Active
+            </p>
+            <p className="text-sm text-blue-700">
+              WebAuthn is restricted in this environment. A simulated fingerprint reader will be used instead.
+            </p>
+          </div>
+        </div>
+      )}
       
       {!isFingerprintSupported && useFingerprintAuth && (
         <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-3">
