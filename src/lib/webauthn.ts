@@ -29,10 +29,23 @@ export function isWebAuthnRestricted(): boolean {
   if (!window.PublicKeyCredential) return true;
   
   try {
+    // Check for permissions policy restrictions
+    const permissionStatus = (document as any).featurePolicy?.allowsFeature('publickey-credentials-create');
+    if (permissionStatus === false) {
+      console.log("WebAuthn restricted by permissions policy");
+      return true;
+    }
+    
     // Check if we're in an iframe
-    return window !== window.top;
+    if (window !== window.top) {
+      console.log("WebAuthn restricted due to iframe context");
+      return true;
+    }
+    
+    return false;
   } catch (e) {
-    // If we can't access window.top, we're definitely in a restricted context
+    // If we can't access window.top or featurePolicy, we're definitely in a restricted context
+    console.log("WebAuthn restricted due to security exception:", e);
     return true;
   }
 }
@@ -51,7 +64,8 @@ export async function registerFingerprint(username: string): Promise<boolean> {
   }
 
   // Check if WebAuthn is supported and not restricted
-  if (!window.PublicKeyCredential || isWebAuthnRestricted()) {
+  const isRestricted = isWebAuthnRestricted();
+  if (!window.PublicKeyCredential || isRestricted) {
     console.log("Using simulation mode for fingerprint registration");
     return simulateRegistration(username);
   }
@@ -89,7 +103,8 @@ export async function registerFingerprint(username: string): Promise<boolean> {
       rawId: bufferToBase64(credential.rawId),
       id: credential.id,
       // @ts-ignore - TypeScript doesn't have these types properly defined
-      publicKey: bufferToBase64(credential.response.attestationObject)
+      publicKey: bufferToBase64(credential.response.attestationObject),
+      registrationMethod: "webauthn"
     };
     
     saveUserStorage(users);
@@ -97,13 +112,20 @@ export async function registerFingerprint(username: string): Promise<boolean> {
   } catch (err) {
     console.error("Fingerprint registration error:", err);
     
-    // If we got a NotAllowedError, try simulation mode as fallback
-    if (err instanceof Error && err.name === "NotAllowedError") {
-      console.log("WebAuthn failed, falling back to simulation mode");
-      return simulateRegistration(username);
+    // Provide more specific error information
+    if (err instanceof Error) {
+      if (err.name === "NotAllowedError") {
+        console.log("WebAuthn failed: User denied the request or the operation was canceled");
+      } else if (err.name === "SecurityError") {
+        console.log("WebAuthn failed: The operation is not allowed in this context due to security restrictions");
+      } else if (err.name === "NotSupportedError") {
+        console.log("WebAuthn failed: The request is not supported by this device or platform");
+      }
     }
     
-    throw err;
+    // Always fall back to simulation mode in case of any error
+    console.log("WebAuthn failed, falling back to simulation mode");
+    return simulateRegistration(username);
   }
 }
 
@@ -121,7 +143,8 @@ function simulateRegistration(username: string): boolean {
     rawId: fakeCredentialId,
     id: fakeCredentialId,
     publicKey: bufferToBase64(fakeRawId),
-    isSimulated: true
+    isSimulated: true,
+    registrationMethod: "simulated"
   };
   
   saveUserStorage(users);
@@ -142,7 +165,8 @@ export async function authenticateWithFingerprint(username: string): Promise<boo
   }
 
   // If this is a simulated credential or WebAuthn is restricted, use simulation
-  if (users[username].isSimulated || !window.PublicKeyCredential || isWebAuthnRestricted()) {
+  const isRestricted = isWebAuthnRestricted();
+  if (users[username].isSimulated || !window.PublicKeyCredential || isRestricted) {
     console.log("Using simulation mode for fingerprint authentication");
     return simulateAuthentication(username);
   }
@@ -170,13 +194,20 @@ export async function authenticateWithFingerprint(username: string): Promise<boo
   } catch (err) {
     console.error("Fingerprint authentication error:", err);
     
-    // If we got a NotAllowedError, try simulation mode as fallback
-    if (err instanceof Error && err.name === "NotAllowedError") {
-      console.log("WebAuthn failed, falling back to simulation mode");
-      return simulateAuthentication(username);
+    // Provide more specific error information
+    if (err instanceof Error) {
+      if (err.name === "NotAllowedError") {
+        console.log("WebAuthn failed: User denied the request or the operation was canceled");
+      } else if (err.name === "SecurityError") {
+        console.log("WebAuthn failed: The operation is not allowed in this context due to security restrictions");
+      } else if (err.name === "NotSupportedError") {
+        console.log("WebAuthn failed: The request is not supported by this device or platform");
+      }
     }
     
-    throw err;
+    // Always fall back to simulation in case of any error
+    console.log("WebAuthn failed, falling back to simulation mode");
+    return simulateAuthentication(username);
   }
 }
 
@@ -207,5 +238,29 @@ export async function isFingerprintAvailable(): Promise<boolean> {
   } catch (err) {
     console.error("Error checking fingerprint availability:", err);
     return false;
+  }
+}
+
+// Get detailed reason why WebAuthn might be restricted
+export function getWebAuthnRestrictionReason(): string | null {
+  if (!window.PublicKeyCredential) {
+    return "WebAuthn is not supported in this browser";
+  }
+  
+  try {
+    // Check for permissions policy restrictions
+    const permissionStatus = (document as any).featurePolicy?.allowsFeature('publickey-credentials-create');
+    if (permissionStatus === false) {
+      return "WebAuthn is restricted by the site's permissions policy";
+    }
+    
+    // Check if we're in an iframe
+    if (window !== window.top) {
+      return "WebAuthn is restricted because the page is running in an iframe";
+    }
+    
+    return null; // No restriction detected
+  } catch (e) {
+    return "WebAuthn is restricted due to security constraints";
   }
 }

@@ -1,13 +1,17 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Loader2, Check, X, AlertTriangle } from 'lucide-react';
+import { Loader2, Check, X, AlertTriangle, Fingerprint, Info } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import BiometricScanner from '@/components/ui/BiometricScanner';
-import { registerFingerprint, isFingerprintAvailable } from '@/lib/webauthn';
+import { 
+  registerFingerprint, 
+  isFingerprintAvailable, 
+  isWebAuthnRestricted,
+  getWebAuthnRestrictionReason 
+} from '@/lib/webauthn';
 
 const steps = [
   { id: 'personal', title: 'Personal Information' },
@@ -32,13 +36,37 @@ const RegisterForm = () => {
   const [familyMembers, setFamilyMembers] = useState<string[]>(['']);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFingerprintSupported, setIsFingerprintSupported] = useState(false);
+  const [webAuthnStatus, setWebAuthnStatus] = useState<{
+    isRestricted: boolean;
+    restrictionReason: string | null;
+    isAvailable: boolean;
+  }>({
+    isRestricted: false,
+    restrictionReason: null,
+    isAvailable: false
+  });
 
   useEffect(() => {
-    // Check if fingerprint is available
+    // Check if fingerprint is available and if WebAuthn is restricted
     const checkFingerprint = async () => {
       const available = await isFingerprintAvailable();
+      const restricted = isWebAuthnRestricted();
+      const restrictionReason = restricted ? getWebAuthnRestrictionReason() : null;
+      
+      setWebAuthnStatus({
+        isRestricted: restricted,
+        restrictionReason,
+        isAvailable: available
+      });
+      
       setIsFingerprintSupported(available);
-      if (!available) {
+      
+      if (restricted) {
+        toast.info("Using simulated fingerprint authentication", {
+          description: restrictionReason || "Your environment has WebAuthn restrictions",
+          duration: 6000
+        });
+      } else if (!available) {
         toast.warning("Fingerprint authentication isn't supported on this device", {
           description: "We'll use simulation mode instead",
           duration: 5000
@@ -74,18 +102,20 @@ const RegisterForm = () => {
   };
 
   const registerUserFingerprint = async () => {
-    if (!isFingerprintSupported) {
-      simulateBiometricScan('fingerprint');
-      return;
-    }
-    
     setFingerprintStatus('scanning');
     
     try {
       const success = await registerFingerprint(formData.email);
       if (success) {
         setFingerprintStatus('success');
-        toast.success('Fingerprint registered successfully');
+        
+        if (webAuthnStatus.isRestricted) {
+          toast.success('Simulated fingerprint registered successfully', {
+            description: 'Using simulation mode due to WebAuthn restrictions'
+          });
+        } else {
+          toast.success('Fingerprint registered successfully');
+        }
       } else {
         setFingerprintStatus('error');
         toast.error('Failed to register fingerprint');
@@ -93,7 +123,7 @@ const RegisterForm = () => {
     } catch (error) {
       console.error('Fingerprint registration error:', error);
       setFingerprintStatus('error');
-      toast.error(`Fingerprint registration failed: ${(error as Error).message}`);
+      toast.error(`Registration failed: ${(error as Error).message}`);
     }
   };
 
@@ -275,7 +305,23 @@ const RegisterForm = () => {
           <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold text-biometric-dark mb-6">Biometric Registration</h2>
             
-            {!isFingerprintSupported && (
+            {webAuthnStatus.isRestricted && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md flex items-start gap-3">
+                <Info className="text-blue-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-blue-800">
+                    Using simulation mode for fingerprint registration
+                  </p>
+                  <p className="text-sm text-blue-700">
+                    {webAuthnStatus.restrictionReason || "WebAuthn is not available in your current environment."}
+                    <br />
+                    Your registration will still work, but we're using a simulated fingerprint instead.
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {!webAuthnStatus.isRestricted && !isFingerprintSupported && (
               <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-3">
                 <AlertTriangle className="text-amber-500 mt-0.5 flex-shrink-0" />
                 <div>
@@ -293,14 +339,15 @@ const RegisterForm = () => {
             <div className="bg-gray-50 p-6 rounded-lg">
               <h3 className="text-lg font-medium mb-4">Fingerprint Registration</h3>
               <div className="flex items-center gap-4">
-                <div className="w-24 h-24 bg-white rounded-lg flex items-center justify-center border border-gray-200">
+                <div className="w-24 h-24 bg-white rounded-lg flex items-center justify-center border border-gray-200 relative">
                   {fingerprintStatus === 'idle' && (
-                    <div className="text-gray-400 text-sm text-center">
-                      Ready to scan
-                    </div>
+                    <Fingerprint className="w-12 h-12 text-gray-400" />
                   )}
                   {fingerprintStatus === 'scanning' && (
-                    <Loader2 className="w-8 h-8 text-biometric-blue animate-spin" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="animate-ping absolute w-16 h-16 rounded-full bg-biometric-blue/30"></div>
+                      <Fingerprint className="w-12 h-12 text-biometric-blue animate-pulse" />
+                    </div>
                   )}
                   {fingerprintStatus === 'success' && (
                     <Check className="w-12 h-12 text-biometric-success" />
@@ -311,9 +358,11 @@ const RegisterForm = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-3">
-                    {isFingerprintSupported 
-                      ? "Place your finger on the scanner to register your fingerprint." 
-                      : "Simulation mode: Click the button to simulate fingerprint registration."}
+                    {webAuthnStatus.isRestricted 
+                      ? "Simulation mode: Click the button to register a simulated fingerprint." 
+                      : isFingerprintSupported 
+                        ? "Place your finger on the scanner to register your fingerprint." 
+                        : "Simulation mode: Click the button to simulate fingerprint registration."}
                   </p>
                   <Button
                     type="button"

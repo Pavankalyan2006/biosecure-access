@@ -1,10 +1,21 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import RegisterForm from '@/components/auth/RegisterForm';
+import { isWebAuthnRestricted, getWebAuthnRestrictionReason } from '@/lib/webauthn';
+import { toast } from 'sonner';
 
 const Register = () => {
+  useEffect(() => {
+    // Check for WebAuthn restrictions when the page loads
+    const restricted = isWebAuthnRestricted();
+    if (restricted) {
+      const reason = getWebAuthnRestrictionReason();
+      console.log("WebAuthn restriction detected:", reason);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
