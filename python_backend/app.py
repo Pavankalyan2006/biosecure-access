@@ -5,7 +5,8 @@ import time
 import random
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+# Configure CORS to allow requests from any origin
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # In a real application, these would be more sophisticated modules
 # with actual biometric processing capabilities
@@ -45,8 +46,13 @@ users = {
     }
 }
 
-@app.route('/api/validate-credentials', methods=['POST'])
+@app.route('/api/validate-credentials', methods=['POST', 'OPTIONS', 'HEAD'])
 def validate_credentials():
+    if request.method == 'OPTIONS' or request.method == 'HEAD':
+        # Handle preflight requests
+        response = jsonify({"status": "OK"})
+        return response
+        
     data = request.json
     email = data.get('email')
     password = data.get('password')
@@ -58,8 +64,18 @@ def validate_credentials():
     else:
         return jsonify({"success": False, "message": "Invalid email or password"})
 
-@app.route('/api/biometric/fingerprint', methods=['POST'])
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint to verify the server is running"""
+    return jsonify({"status": "OK", "message": "Biometric server is running"})
+
+@app.route('/api/biometric/fingerprint', methods=['POST', 'OPTIONS'])
 def verify_fingerprint():
+    if request.method == 'OPTIONS':
+        # Handle preflight requests
+        response = jsonify({"status": "OK"})
+        return response
+        
     data = request.json
     user_id = data.get('userId')
     
@@ -68,8 +84,13 @@ def verify_fingerprint():
     result = fingerprint_scanner.verify(data)
     return jsonify({"success": result})
 
-@app.route('/api/biometric/heartbeat', methods=['POST'])
+@app.route('/api/biometric/heartbeat', methods=['POST', 'OPTIONS'])
 def verify_heartbeat():
+    if request.method == 'OPTIONS':
+        # Handle preflight requests
+        response = jsonify({"status": "OK"})
+        return response
+        
     data = request.json
     user_id = data.get('userId')
     
@@ -78,8 +99,13 @@ def verify_heartbeat():
     result = heartbeat_scanner.verify(data)
     return jsonify({"success": result})
 
-@app.route('/api/biometric/dna', methods=['POST'])
+@app.route('/api/biometric/dna', methods=['POST', 'OPTIONS'])
 def verify_dna():
+    if request.method == 'OPTIONS':
+        # Handle preflight requests
+        response = jsonify({"status": "OK"})
+        return response
+        
     data = request.json
     user_id = data.get('userId')
     
@@ -93,4 +119,10 @@ if __name__ == '__main__':
     print("Server URL: http://localhost:5000")
     print("Default User: user@example.com / password123")
     print("Biometric processing services initialized.")
-    app.run(debug=True, port=5000)
+    print("API Endpoints:")
+    print("  - GET /api/health")
+    print("  - POST /api/validate-credentials")
+    print("  - POST /api/biometric/fingerprint")
+    print("  - POST /api/biometric/heartbeat")
+    print("  - POST /api/biometric/dna")
+    app.run(debug=True, port=5000, host='0.0.0.0')

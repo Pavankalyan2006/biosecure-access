@@ -27,12 +27,20 @@ const AuthenticationFlow = () => {
   useEffect(() => {
     const checkServerConnection = async () => {
       try {
-        const response = await fetch(`${BIOMETRIC_SERVER_URL}/api/validate-credentials`, {
-          method: 'HEAD',
-          mode: 'no-cors'
+        const response = await fetch(`${BIOMETRIC_SERVER_URL}/api/health`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
         });
-        setServerConnected(true);
-        setApiStatus(null);
+        
+        if (response.ok) {
+          setServerConnected(true);
+          setApiStatus(null);
+          console.log('Biometric server is connected and running');
+        } else {
+          throw new Error('Server returned an error response');
+        }
       } catch (error) {
         console.error('Failed to connect to biometric server:', error);
         setServerConnected(false);
