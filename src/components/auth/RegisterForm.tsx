@@ -1,11 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Loader2, Check, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Loader2, Check, X, AlertTriangle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import BiometricScanner from '@/components/ui/BiometricScanner';
+import { registerFingerprint, isFingerprintAvailable } from '@/lib/webauthn';
 
 const steps = [
   { id: 'personal', title: 'Personal Information' },
@@ -16,6 +18,7 @@ const steps = [
 
 const RegisterForm = () => {
   const [currentStep, setCurrentStep] = useState('personal');
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -28,6 +31,23 @@ const RegisterForm = () => {
   const [dnaStatus, setDnaStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle');
   const [familyMembers, setFamilyMembers] = useState<string[]>(['']);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFingerprintSupported, setIsFingerprintSupported] = useState(false);
+
+  useEffect(() => {
+    // Check if fingerprint is available
+    const checkFingerprint = async () => {
+      const available = await isFingerprintAvailable();
+      setIsFingerprintSupported(available);
+      if (!available) {
+        toast.warning("Fingerprint authentication isn't supported on this device", {
+          description: "We'll use simulation mode instead",
+          duration: 5000
+        });
+      }
+    };
+    
+    checkFingerprint();
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -51,6 +71,30 @@ const RegisterForm = () => {
     const updatedMembers = [...familyMembers];
     updatedMembers.splice(index, 1);
     setFamilyMembers(updatedMembers);
+  };
+
+  const registerUserFingerprint = async () => {
+    if (!isFingerprintSupported) {
+      simulateBiometricScan('fingerprint');
+      return;
+    }
+    
+    setFingerprintStatus('scanning');
+    
+    try {
+      const success = await registerFingerprint(formData.email);
+      if (success) {
+        setFingerprintStatus('success');
+        toast.success('Fingerprint registered successfully');
+      } else {
+        setFingerprintStatus('error');
+        toast.error('Failed to register fingerprint');
+      }
+    } catch (error) {
+      console.error('Fingerprint registration error:', error);
+      setFingerprintStatus('error');
+      toast.error(`Fingerprint registration failed: ${(error as Error).message}`);
+    }
   };
 
   const simulateBiometricScan = (type: 'fingerprint' | 'heartbeat' | 'dna') => {
@@ -151,11 +195,6 @@ const RegisterForm = () => {
             }`}>
               {step.title}
             </span>
-            {index < steps.length - 1 && (
-              <div className="hidden sm:block absolute h-[2px] w-16 bg-gray-100 top-4 left-0" 
-                style={{ left: `calc(${(index * 100) / (steps.length - 1)}% + 2rem)` }}
-              />
-            )}
           </div>
         ))}
       </div>
@@ -236,8 +275,23 @@ const RegisterForm = () => {
           <div className="space-y-6 animate-fade-in">
             <h2 className="text-2xl font-bold text-biometric-dark mb-6">Biometric Registration</h2>
             
+            {!isFingerprintSupported && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-3">
+                <AlertTriangle className="text-amber-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">
+                    Fingerprint authentication not available
+                  </p>
+                  <p className="text-sm text-amber-700">
+                    Your device doesn't support fingerprint authentication or it's not enabled. 
+                    We'll use simulation mode instead.
+                  </p>
+                </div>
+              </div>
+            )}
+            
             <div className="bg-gray-50 p-6 rounded-lg">
-              <h3 className="text-lg font-medium mb-4">Fingerprint Scan</h3>
+              <h3 className="text-lg font-medium mb-4">Fingerprint Registration</h3>
               <div className="flex items-center gap-4">
                 <div className="w-24 h-24 bg-white rounded-lg flex items-center justify-center border border-gray-200">
                   {fingerprintStatus === 'idle' && (
@@ -257,13 +311,15 @@ const RegisterForm = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500 mb-3">
-                    Place your finger on the scanner to register your fingerprint.
+                    {isFingerprintSupported 
+                      ? "Place your finger on the scanner to register your fingerprint." 
+                      : "Simulation mode: Click the button to simulate fingerprint registration."}
                   </p>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => simulateBiometricScan('fingerprint')}
+                    onClick={registerUserFingerprint}
                     disabled={fingerprintStatus === 'scanning' || fingerprintStatus === 'success'}
                     className="border-biometric-blue text-biometric-blue hover:bg-biometric-blue/10"
                   >
